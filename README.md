@@ -12,7 +12,7 @@ This repository contains:
 ## Open the visual
 
 Click here after the site is live:
-https://YOUR_USERNAME.github.io/funnel-rule/
+https://philipakintola01-sys.github.io/funnel-rule
 
 ## The Rule (simple version)
 
