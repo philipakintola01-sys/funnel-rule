@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>The Funnel Rule</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f4f0; color: #0a0a0f; padding: 2rem; }
+  .scene { display: flex; gap: 24px; align-items: flex-start; max-width: 700px; margin: 0 auto; }
+  .col-label { font-size: 10px; font-family: monospace; color: #888; text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 10px; }
+  .ft { border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 12px; color: #888; background: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; user-select: none; transition: all 0.18s; }
+  .ft .d { width: 9px; height: 9px; border-radius: 50%; background: #ddd; flex-shrink: 0; transition: background 0.18s; }
+  .ft.on { color: #111; border-color: #555; }
+  .ft.on .d { background: #111; }
+  .score { font-size: 56px; font-weight: 500; text-align: center; transition: all 0.35s; }
+  .bar-wrap { width: 100%; height: 7px; background: #e5e5e5; border-radius: 4px; margin-top: 10px; overflow: hidden; }
+  .bar { height: 100%; border-radius: 4px; background: #888; transition: width 0.45s, background 0.45s; }
+  .verdict { font-size: 11px; color: #666; text-align: center; margin-top: 10px; line-height: 1.55; min-height: 48px; font-family: monospace; }
+  .badge { display: none; margin-top: 12px; padding: 6px 14px; border-radius: 100px; background: #d4edda; color: #155724; font-size: 11px; font-weight: 600; font-family: monospace; text-align: center; letter-spacing: 0.05em; }
+  .badge.show { display: block; }
+  .note { margin-top: 1.5rem; padding: 10px 14px; border-left: 3px solid #ccc; font-size: 11px; color: #666; line-height: 1.6; font-family: monospace; max-width: 700px; margin-left: auto; margin-right: auto; }
+  canvas { display: block; margin: 0 auto; }
+</style>
+</head>
+<body>
+<div class="scene">
+  <div style="width:195px;flex-shrink:0">
+    <div class="col-label">Toggle frames</div>
+    <div class="ft on" onclick="tog(this)"><span class="d"></span>Western biography</div>
+    <div class="ft" onclick="tog(this)"><span class="d"></span>African reality</div>
+    <div class="ft" onclick="tog(this)"><span class="d"></span>Failure cases</div>
+    <div class="ft on" onclick="tog(this)"><span class="d"></span>Cognitive science</div>
+    <div class="ft" onclick="tog(this)"><span class="d"></span>Theological frame</div>
+    <div class="ft" onclick="tog(this)"><span class="d"></span>Counter-examples</div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center">
+    <div class="col-label">Probability method</div>
+    <canvas id="cv" width="160" height="200"></canvas>
+    <div id="fcount" style="font-size:10px;font-family:monospace;color:#999;margin-top:4px;text-align:center">2 of 6 frames</div>
+  </div>
+
+  <div style="width:155px;flex-shrink:0;display:flex;flex-direction:column;align-items:center">
+    <div class="col-label" style="text-align:center">Output quality</div>
+    <div class="score" id="score">33</div>
+    <div style="font-size:11px;font-family:monospace;color:#888;text-align:center;margin-top:2px">/100</div>
+    <div class="bar-wrap"><div class="bar" id="bar" style="width:33%"></div></div>
+    <div class="verdict" id="verdict">Biased. Math dresses up a pre-chosen narrative.</div>
+    <div class="badge" id="badge">the funnel rule</div>
+  </div>
+</div>
+
+<div class="note" id="note">With only 2 frames active: the model runs but outputs whatever the selected frames contain — not reality.</div>
+
+<script>
+var COLORS = ['#1D9E75','#378ADD','#D85A30','#7F77DD','#EF9F27','#D4537E'];
+var NOTES = [
+  'Zero frames: you have no prediction. Just a number attached to a feeling.',
+  'With 1 frame: the model runs but outputs only what that single frame contains.',
+  'With 2 frames: the output reflects the frames you chose, not reality.',
+  'With 3 frames: the shape of an answer appears but the edges are still invisible.',
+  'With 4 frames: genuine signal. Uncertainty becomes visible rather than hidden.',
+  'With 5 frames: the prediction is now honest about what it does not know.',
+  'The funnel rule — all frames open. The method does what it was designed to do.'
+];
+var VERDICTS = [
+  [0, 34, '#e05a30', 'Biased. Math dresses up a pre-chosen narrative.'],
+  [34, 51, '#e08030', 'Partial but still biased. Significant gaps remain.'],
+  [51, 68, '#d4a017', 'Partial. Real signal exists but edges are cut off.'],
+  [68, 85, '#3a7d44', 'Reasonably objective. Uncertainty is now honest.'],
+  [85, 100, '#1D9E75', 'High objectivity. Wide aperture. Output can be trusted.'],
+  [100, 101, '#1D9E75', 'The funnel rule. All frames open. Maximum honest prediction.']
+];
+
+function tog(el) {
+  var isOn = el.classList.contains('on');
+  var dot = el.querySelector('.d');
+  if (isOn) {
+    el.classList.remove('on');
+    el.style.borderColor = '#ddd';
+    el.style.color = '#888';
+    dot.style.background = '#ddd';
+  } else {
+    el.classList.add('on');
+    el.style.borderColor = '#555';
+    el.style.color = '#111';
+    dot.style.background = '#111';
+  }
+  upd();
+}
+
+function upd() {
+  var all = Array.from(document.querySelectorAll('.ft'));
+  var on = all.filter(function(t){ return t.classList.contains('on'); });
+  var score = Math.round((on.length / all.length) * 100);
+  var atMax = on.length === all.length;
+
+  document.getElementById('score').textContent = score;
+  document.getElementById('fcount').textContent = on.length + ' of ' + all.length + ' frames';
+  document.getElementById('badge').classList.toggle('show', atMax);
+  document.getElementById('note').textContent = NOTES[Math.min(on.length, NOTES.length - 1)];
+
+  var col = '#888', txt = '';
+  for (var i = 0; i < VERDICTS.length; i++) {
+    if (score >= VERDICTS[i][0] && score < VERDICTS[i][1]) { col = VERDICTS[i][2]; txt = VERDICTS[i][3]; break; }
+  }
+  if (score === 100) { col = '#1D9E75'; txt = 'The funnel rule. All frames open. Maximum honest prediction.'; }
+
+  document.getElementById('bar').style.width = score + '%';
+  document.getElementById('bar').style.background = col;
+  document.getElementById('verdict').textContent = txt;
+
+  drawFunnel(all, on);
+}
+
+function drawFunnel(all, on) {
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, 160, 200);
+
+  // Funnel shape
+  ctx.beginPath();
+  ctx.moveTo(10, 10); ctx.lineTo(150, 10);
+  ctx.lineTo(105, 130); ctx.lineTo(55, 130);
+  ctx.closePath();
+  ctx.fillStyle = '#f0efe8';
+  ctx.fill();
+
+  // Colored stripes inside funnel
+  if (on.length > 0) {
+    on.forEach(function(t, i) {
+      var p1 = i / on.length, p2 = (i+1) / on.length;
+      var y1 = 10 + p1*120, y2 = 10 + p2*120;
+      var xl1 = 10+p1*45, xr1 = 150-p1*45;
+      var xl2 = 10+p2*45, xr2 = 150-p2*45;
+      ctx.beginPath();
+      ctx.moveTo(xl1,y1); ctx.lineTo(xr1,y1);
+      ctx.lineTo(xr2,y2); ctx.lineTo(xl2,y2);
+      ctx.closePath();
+      ctx.fillStyle = COLORS[all.indexOf(t)];
+      ctx.globalAlpha = 0.28;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  // Funnel border
+  ctx.beginPath();
+  ctx.moveTo(10, 10); ctx.lineTo(150, 10);
+  ctx.lineTo(105, 130); ctx.lineTo(55, 130);
+  ctx.closePath();
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Method label
+  ctx.fillStyle = '#aaa';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('probability', 80, 72);
+  ctx.fillText('method', 80, 84);
+
+  // Tube
+  ctx.fillStyle = '#f0efe8';
+  ctx.strokeStyle = '#ccc';
+  ctx.beginPath();
+  ctx.rect(66, 130, 28, 44);
+  ctx.fill(); ctx.stroke();
+
+  // Output dot
+  var score = Math.round((on.length / all.length) * 100);
+  var dotCol = '#888';
+  for (var i = 0; i < VERDICTS.length; i++) {
+    if (score >= VERDICTS[i][0] && score < VERDICTS[i][1]) { dotCol = VERDICTS[i][2]; break; }
+  }
+  if (score === 100) dotCol = '#1D9E75';
+
+  ctx.beginPath();
+  ctx.arc(80, 188, 9, 0, Math.PI*2);
+  ctx.fillStyle = dotCol;
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 8px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(score, 80, 192);
+}
+
+upd();
+</script>
+</body>
+</html>
